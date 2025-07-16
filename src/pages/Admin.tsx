@@ -174,7 +174,7 @@ const Admin: React.FC = () => {
     if (!item.name?.trim()) return 'Name is required';
     if (!item.description?.trim()) return 'Description is required';
     
-    // Category validation
+    // Category validation - simplified
     if (activeTab === 'categories') {
       if (item.name.length > 60) return 'Category title must be 60 characters or less';
       if (item.description.length > 160) return 'Category description must be 160 characters or less';
@@ -272,7 +272,7 @@ const Admin: React.FC = () => {
           image_alt: editingItem.image_alt?.trim() || null,
         };
       }
-      // For categories, we only save the basic fields (no image fields)
+      // For categories, we only save the basic fields (name, description, seo_title, seo_description)
 
       let result;
       if (editingItem.id) {
