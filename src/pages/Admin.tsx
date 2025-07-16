@@ -4,31 +4,12 @@ import { supabase } from '../lib/supabase';
 import { Sparkles, Bot, Search, Save, Plus, X, LogOut, Upload, Check, Link as LinkIcon } from 'lucide-react';
 import toast, { Toaster } from 'react-hot-toast';
 
-interface Feature {
-  title: string;
-  description: string;
-}
-
-interface UseCase {
-  title: string;
-  description: string;
-}
-
-interface PricingPlan {
-  plan: string;
-  price: string;
-  features: string[];
-}
-
 interface EditingItem {
   id?: string;
   name?: string;
   description?: string;
   seo_title?: string;
   seo_description?: string;
-  features?: Feature[];
-  useCases?: UseCase[];
-  pricing?: PricingPlan[];
   type?: 'tool' | 'category' | 'agent';
   image_url?: string;
   image_alt?: string;
@@ -46,12 +27,15 @@ interface EditingItem {
   is_verified?: boolean;
   agent_features?: string[];
   how_to_use?: string;
+  features?: any[];
+  useCases?: any[];
+  pricing?: any[];
   [key: string]: any;
 }
 
 const Admin: React.FC = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'tools' | 'categories' | 'agents'>('tools');
+  const [activeTab, setActiveTab] = useState<'tools' | 'categories' | 'agents'>('categories');
   const [items, setItems] = useState<EditingItem[]>([]);
   const [filteredItems, setFilteredItems] = useState<EditingItem[]>([]);
   const [editingItem, setEditingItem] = useState<EditingItem | null>(null);
@@ -66,12 +50,17 @@ const Admin: React.FC = () => {
   // Check admin authentication
   useEffect(() => {
     const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setIsLoggedIn(true);
-        setUser(session.user);
-      } else {
-        toast.error('Please log in to access the admin panel');
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          setIsLoggedIn(true);
+          setUser(session.user);
+        } else {
+          toast.error('Please log in to access the admin panel');
+          navigate('/login');
+        }
+      } catch (error) {
+        console.error('Auth check error:', error);
         navigate('/login');
       }
     };
@@ -174,58 +163,12 @@ const Admin: React.FC = () => {
     if (!item.name?.trim()) return 'Name is required';
     if (!item.description?.trim()) return 'Description is required';
     
-    // Category validation - simplified
-    if (activeTab === 'categories') {
-      if (item.name.length > 60) return 'Category title must be 60 characters or less';
-      if (item.description.length > 160) return 'Category description must be 160 characters or less';
-    }
-    
     if (activeTab === 'tools') {
       if (!item.url?.trim()) return 'Tool URL is required';
       if (!item.category_id) return 'Category is required';
     }
     
     return null;
-  };
-
-  // Convert file to base64 for simple storage
-  const convertToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = error => reject(error);
-    });
-  };
-
-  const handleImageUpload = async (file: File) => {
-    if (!file) return;
-
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file');
-      return;
-    }
-
-    // Validate file size (max 2MB for base64)
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error('Image size must be less than 2MB');
-      return;
-    }
-
-    setUploadingImage(true);
-    try {
-      // Convert to base64 and store directly in the database
-      const base64String = await convertToBase64(file);
-      
-      setEditingItem(prev => prev ? { ...prev, image_url: base64String } : null);
-      toast.success('Image uploaded successfully');
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      toast.error('Failed to upload image');
-    } finally {
-      setUploadingImage(false);
-    }
   };
 
   const handleSave = async () => {
@@ -270,9 +213,10 @@ const Admin: React.FC = () => {
           pricing_type: editingItem.pricing_type || 'free',
           image_url: editingItem.image_url?.trim() || null,
           image_alt: editingItem.image_alt?.trim() || null,
+          status: 'active',
+          capabilities: editingItem.agent_features?.filter(feature => feature.trim()) || [],
         };
       }
-      // For categories, we only save the basic fields (name, description, seo_title, seo_description)
 
       let result;
       if (editingItem.id) {
@@ -305,75 +249,6 @@ const Admin: React.FC = () => {
     } finally {
       setSaving(false);
     }
-  };
-
-  const addFeature = () => {
-    if (!editingItem) return;
-    const features = editingItem.features || [];
-    setEditingItem({
-      ...editingItem,
-      features: [...features, { title: '', description: '' }]
-    });
-  };
-
-  const removeFeature = (index: number) => {
-    if (!editingItem?.features) return;
-    const features = [...editingItem.features];
-    features.splice(index, 1);
-    setEditingItem({ ...editingItem, features });
-  };
-
-  const updateFeature = (index: number, field: keyof Feature, value: string) => {
-    if (!editingItem?.features) return;
-    const features = [...editingItem.features];
-    features[index] = { ...features[index], [field]: value };
-    setEditingItem({ ...editingItem, features });
-  };
-
-  const addUseCase = () => {
-    if (!editingItem) return;
-    const useCases = editingItem.useCases || [];
-    setEditingItem({
-      ...editingItem,
-      useCases: [...useCases, { title: '', description: '' }]
-    });
-  };
-
-  const removeUseCase = (index: number) => {
-    if (!editingItem?.useCases) return;
-    const useCases = [...editingItem.useCases];
-    useCases.splice(index, 1);
-    setEditingItem({ ...editingItem, useCases });
-  };
-
-  const updateUseCase = (index: number, field: keyof UseCase, value: string) => {
-    if (!editingItem?.useCases) return;
-    const useCases = [...editingItem.useCases];
-    useCases[index] = { ...useCases[index], [field]: value };
-    setEditingItem({ ...editingItem, useCases });
-  };
-
-  const addPricingPlan = () => {
-    if (!editingItem) return;
-    const pricing = editingItem.pricing || [];
-    setEditingItem({
-      ...editingItem,
-      pricing: [...pricing, { plan: '', price: '', features: [] }]
-    });
-  };
-
-  const removePricingPlan = (index: number) => {
-    if (!editingItem?.pricing) return;
-    const pricing = [...editingItem.pricing];
-    pricing.splice(index, 1);
-    setEditingItem({ ...editingItem, pricing });
-  };
-
-  const updatePricingPlan = (index: number, field: keyof PricingPlan, value: any) => {
-    if (!editingItem?.pricing) return;
-    const pricing = [...editingItem.pricing];
-    pricing[index] = { ...pricing[index], [field]: value };
-    setEditingItem({ ...editingItem, pricing });
   };
 
   const addAgentFeature = () => {
@@ -421,15 +296,6 @@ const Admin: React.FC = () => {
           <div className="flex items-center space-x-4">
             <div className="flex space-x-4">
               <button
-                onClick={() => setActiveTab('tools')}
-                className={`px-4 py-2 rounded-lg flex items-center space-x-2 transition-all ${
-                  activeTab === 'tools' ? 'bg-primary-500 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-700'
-                }`}
-              >
-                <Search className="w-5 h-5" />
-                <span>Tools</span>
-              </button>
-              <button
                 onClick={() => setActiveTab('categories')}
                 className={`px-4 py-2 rounded-lg flex items-center space-x-2 transition-all ${
                   activeTab === 'categories' ? 'bg-primary-500 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-700'
@@ -437,6 +303,15 @@ const Admin: React.FC = () => {
               >
                 <Sparkles className="w-5 h-5" />
                 <span>Categories</span>
+              </button>
+              <button
+                onClick={() => setActiveTab('tools')}
+                className={`px-4 py-2 rounded-lg flex items-center space-x-2 transition-all ${
+                  activeTab === 'tools' ? 'bg-primary-500 text-white' : 'text-slate-400 hover:text-white hover:bg-slate-700'
+                }`}
+              >
+                <Search className="w-5 h-5" />
+                <span>Tools</span>
               </button>
               <button
                 onClick={() => setActiveTab('agents')}
@@ -543,130 +418,30 @@ const Admin: React.FC = () => {
                     <div className="space-y-4">
                       <div>
                         <label className="block text-sm font-medium text-slate-300 mb-2">
-                          {activeTab === 'categories' ? 'Category Title' : 'Name'} *
-                          {activeTab === 'categories' && (
-                            <span className="text-xs text-slate-400 ml-2">(max 60 characters)</span>
-                          )}
+                          Name *
                         </label>
                         <input
                           type="text"
                           value={editingItem.name || ''}
                           onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
                           className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-primary-500"
-                          placeholder={activeTab === 'categories' ? 'Enter a clear, descriptive title' : 'Enter name'}
-                          maxLength={activeTab === 'categories' ? 60 : undefined}
+                          placeholder="Enter name"
                           required
                         />
-                        {activeTab === 'categories' && (
-                          <div className="text-xs text-slate-400 mt-1">
-                            {(editingItem.name?.length || 0)}/60 characters
-                          </div>
-                        )}
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-slate-300 mb-2">
-                          {activeTab === 'categories' ? 'Category Description' : 'Description'} *
-                          {activeTab === 'categories' && (
-                            <span className="text-xs text-slate-400 ml-2">(max 160 characters)</span>
-                          )}
+                          Description *
                         </label>
                         <textarea
                           value={editingItem.description || ''}
                           onChange={(e) => setEditingItem({ ...editingItem, description: e.target.value })}
                           rows={3}
                           className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-primary-500"
-                          placeholder={activeTab === 'categories' ? 'Enter a detailed description' : 'Enter description'}
-                          maxLength={activeTab === 'categories' ? 160 : undefined}
+                          placeholder="Enter description"
                           required
                         />
-                        {activeTab === 'categories' && (
-                          <div className="text-xs text-slate-400 mt-1">
-                            {(editingItem.description?.length || 0)}/160 characters
-                          </div>
-                        )}
                       </div>
-
-                      {/* Image Upload Section - Only for Tools and Agents */}
-                      {activeTab !== 'categories' && (
-                        <div>
-                          <label className="block text-sm font-medium text-slate-300 mb-2">
-                            Image
-                          </label>
-                          <div className="space-y-4">
-                            {/* Current Image Preview */}
-                            {editingItem.image_url && (
-                              <div className="relative">
-                                <div className="aspect-16-9 w-32 rounded-lg overflow-hidden border border-slate-600">
-                                  <img
-                                    src={editingItem.image_url}
-                                    alt="Preview"
-                                    className="image-cover"
-                                  />
-                                </div>
-                                <button
-                                  onClick={() => setEditingItem({ ...editingItem, image_url: '' })}
-                                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
-                                >
-                                  <X className="w-4 h-4" />
-                                </button>
-                              </div>
-                            )}
-                            
-                            {/* Upload Options */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              {/* File Upload */}
-                              <div>
-                                <label className="cursor-pointer block">
-                                  <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={(e) => {
-                                      const file = e.target.files?.[0];
-                                      if (file) handleImageUpload(file);
-                                    }}
-                                    className="hidden"
-                                    disabled={uploadingImage}
-                                  />
-                                  <div className="flex items-center justify-center space-x-2 bg-slate-700 border border-slate-600 rounded-lg px-4 py-3 hover:border-primary-500 transition-colors">
-                                    <Upload className="w-4 h-4" />
-                                    <span>{uploadingImage ? 'Uploading...' : 'Upload from PC'}</span>
-                                  </div>
-                                </label>
-                                <p className="text-xs text-slate-400 mt-1">Max 2MB, JPG/PNG/GIF</p>
-                              </div>
-                              
-                              {/* URL Input */}
-                              <div>
-                                <div className="flex items-center space-x-2 bg-slate-700 border border-slate-600 rounded-lg px-4 py-3">
-                                  <LinkIcon className="w-4 h-4 text-slate-400" />
-                                  <input
-                                    type="text"
-                                    value={editingItem.image_url?.startsWith('data:') ? '' : (editingItem.image_url || '')}
-                                    onChange={(e) => setEditingItem({ ...editingItem, image_url: e.target.value })}
-                                    placeholder="Or paste image URL"
-                                    className="flex-1 bg-transparent text-white focus:outline-none"
-                                  />
-                                </div>
-                                <p className="text-xs text-slate-400 mt-1">Paste direct image link</p>
-                              </div>
-                            </div>
-                            
-                            {/* Image Alt Text */}
-                            <div>
-                              <label className="block text-sm font-medium text-slate-300 mb-2">
-                                Image Alt Text
-                              </label>
-                              <input
-                                type="text"
-                                value={editingItem.image_alt || ''}
-                                onChange={(e) => setEditingItem({ ...editingItem, image_alt: e.target.value })}
-                                placeholder="Describe the image for accessibility"
-                                className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-primary-500"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      )}
 
                       {/* Tool-specific fields */}
                       {activeTab === 'tools' && (
@@ -704,14 +479,14 @@ const Admin: React.FC = () => {
                           </div>
                           <div>
                             <label className="block text-sm font-medium text-slate-300 mb-2">
-                              How to Use
+                              Image URL
                             </label>
-                            <textarea
-                              value={editingItem.how_to_use || ''}
-                              onChange={(e) => setEditingItem({ ...editingItem, how_to_use: e.target.value })}
-                              rows={5}
+                            <input
+                              type="text"
+                              value={editingItem.image_url || ''}
+                              onChange={(e) => setEditingItem({ ...editingItem, image_url: e.target.value })}
                               className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-primary-500"
-                              placeholder="Explain how to use this tool..."
+                              placeholder="https://example.com/image.jpg"
                             />
                           </div>
                         </>
@@ -755,6 +530,19 @@ const Admin: React.FC = () => {
                               <span className="text-slate-300">Verified (Blue Tick)</span>
                             </label>
                           </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-2">
+                              Image URL
+                            </label>
+                            <input
+                              type="text"
+                              value={editingItem.image_url || ''}
+                              onChange={(e) => setEditingItem({ ...editingItem, image_url: e.target.value })}
+                              className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-primary-500"
+                              placeholder="https://example.com/image.jpg"
+                            />
+                          </div>
                         </>
                       )}
                     </div>
@@ -766,7 +554,7 @@ const Admin: React.FC = () => {
                     <div className="space-y-4">
                       <div>
                         <label className="block text-sm font-medium text-slate-300 mb-2">
-                          Meta Title *
+                          SEO Title
                           <span className="text-xs text-slate-400 ml-2">(60 characters max)</span>
                         </label>
                         <input
@@ -777,7 +565,7 @@ const Admin: React.FC = () => {
                             setEditingItem({ ...editingItem, seo_title: value });
                           }}
                           className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-primary-500"
-                          placeholder="Same as title or optimized version"
+                          placeholder="SEO optimized title"
                         />
                         <div className="text-xs text-slate-400 mt-1">
                           {(editingItem.seo_title?.length || 0)}/60 characters
@@ -786,7 +574,7 @@ const Admin: React.FC = () => {
 
                       <div>
                         <label className="block text-sm font-medium text-slate-300 mb-2">
-                          Meta Description *
+                          SEO Description
                           <span className="text-xs text-slate-400 ml-2">(160 characters max)</span>
                         </label>
                         <textarea
@@ -797,7 +585,7 @@ const Admin: React.FC = () => {
                           }}
                           rows={3}
                           className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-primary-500"
-                          placeholder="Same as description or optimized version"
+                          placeholder="SEO optimized description"
                         />
                         <div className="text-xs text-slate-400 mt-1">
                           {(editingItem.seo_description?.length || 0)}/160 characters
@@ -834,144 +622,6 @@ const Admin: React.FC = () => {
                             >
                               <X className="w-5 h-5" />
                             </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Features (for tools) */}
-                  {activeTab === 'tools' && (
-                    <div className="border-t border-slate-600 pt-6">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-semibold">Features</h3>
-                        <button
-                          onClick={addFeature}
-                          className="text-primary-500 hover:text-primary-400"
-                        >
-                          <Plus className="w-5 h-5" />
-                        </button>
-                      </div>
-                      <div className="space-y-4">
-                        {editingItem.features?.map((feature, index) => (
-                          <div key={index} className="bg-slate-700 p-4 rounded-lg">
-                            <div className="flex justify-between items-start mb-2">
-                              <input
-                                type="text"
-                                value={feature.title}
-                                onChange={(e) => updateFeature(index, 'title', e.target.value)}
-                                placeholder="Feature title"
-                                className="flex-1 px-4 py-2 bg-slate-600 border border-slate-500 rounded-lg text-white focus:outline-none focus:border-primary-500 mr-4"
-                              />
-                              <button
-                                onClick={() => removeFeature(index)}
-                                className="text-slate-400 hover:text-red-500"
-                              >
-                                <X className="w-5 h-5" />
-                              </button>
-                            </div>
-                            <textarea
-                              value={feature.description}
-                              onChange={(e) => updateFeature(index, 'description', e.target.value)}
-                              placeholder="Feature description"
-                              rows={2}
-                              className="w-full px-4 py-2 bg-slate-600 border border-slate-500 rounded-lg text-white focus:outline-none focus:border-primary-500"
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Use Cases (for tools) */}
-                  {activeTab === 'tools' && (
-                    <div className="border-t border-slate-600 pt-6">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-semibold">Use Cases</h3>
-                        <button
-                          onClick={addUseCase}
-                          className="text-primary-500 hover:text-primary-400"
-                        >
-                          <Plus className="w-5 h-5" />
-                        </button>
-                      </div>
-                      <div className="space-y-4">
-                        {editingItem.useCases?.map((useCase, index) => (
-                          <div key={index} className="bg-slate-700 p-4 rounded-lg">
-                            <div className="flex justify-between items-start mb-2">
-                              <input
-                                type="text"
-                                value={useCase.title}
-                                onChange={(e) => updateUseCase(index, 'title', e.target.value)}
-                                placeholder="Use case title"
-                                className="flex-1 px-4 py-2 bg-slate-600 border border-slate-500 rounded-lg text-white focus:outline-none focus:border-primary-500 mr-4"
-                              />
-                              <button
-                                onClick={() => removeUseCase(index)}
-                                className="text-slate-400 hover:text-red-500"
-                              >
-                                <X className="w-5 h-5" />
-                              </button>
-                            </div>
-                            <textarea
-                              value={useCase.description}
-                              onChange={(e) => updateUseCase(index, 'description', e.target.value)}
-                              placeholder="Use case description"
-                              rows={2}
-                              className="w-full px-4 py-2 bg-slate-600 border border-slate-500 rounded-lg text-white focus:outline-none focus:border-primary-500"
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Pricing (for tools) */}
-                  {activeTab === 'tools' && (
-                    <div className="border-t border-slate-600 pt-6">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-semibold">Pricing Plans</h3>
-                        <button
-                          onClick={addPricingPlan}
-                          className="text-primary-500 hover:text-primary-400"
-                        >
-                          <Plus className="w-5 h-5" />
-                        </button>
-                      </div>
-                      <div className="space-y-4">
-                        {editingItem.pricing?.map((plan, index) => (
-                          <div key={index} className="bg-slate-700 p-4 rounded-lg">
-                            <div className="flex justify-between items-start mb-4">
-                              <div className="flex-1 grid grid-cols-2 gap-4">
-                                <input
-                                  type="text"
-                                  value={plan.plan}
-                                  onChange={(e) => updatePricingPlan(index, 'plan', e.target.value)}
-                                  placeholder="Plan name"
-                                  className="px-4 py-2 bg-slate-600 border border-slate-500 rounded-lg text-white focus:outline-none focus:border-primary-500"
-                                />
-                                <input
-                                  type="text"
-                                  value={plan.price}
-                                  onChange={(e) => updatePricingPlan(index, 'price', e.target.value)}
-                                  placeholder="Price"
-                                  className="px-4 py-2 bg-slate-600 border border-slate-500 rounded-lg text-white focus:outline-none focus:border-primary-500"
-                                />
-                              </div>
-                              <button
-                                onClick={() => removePricingPlan(index)}
-                                className="ml-4 text-slate-400 hover:text-red-500"
-                              >
-                                <X className="w-5 h-5" />
-                              </button>
-                            </div>
-                            <textarea
-                              value={plan.features.join('\n')}
-                              onChange={(e) => updatePricingPlan(index, 'features', e.target.value.split('\n').filter(f => f.trim()))}
-                              placeholder="Features (one per line)"
-                              rows={3}
-                              className="w-full px-4 py-2 bg-slate-600 border border-slate-500 rounded-lg text-white focus:outline-none focus:border-primary-500"
-                            />
                           </div>
                         ))}
                       </div>
