@@ -10,6 +10,8 @@ interface Category {
   id: string;
   name: string;
   description: string;
+  seo_title?: string;
+  seo_description?: string;
   tool_count: number;
 }
 
@@ -124,7 +126,7 @@ function Home() {
           // Optimized categories query
           supabase
             .from('categories')
-            .select('id, name, description')
+            .select('id, name, description, seo_title, seo_description')
             .order('name')
             .limit(10), // Limit categories for initial load
           

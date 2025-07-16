@@ -5,13 +5,13 @@ import { supabase } from '../lib/supabase';
 import { SEO } from '../components/SEO';
 import { generateCategorySchema } from '../utils/schema';
 import { LazyImage } from '../components/LazyImage';
-import { Pagination } from '../components/Pagination';
-import { usePagination } from '../hooks/usePagination';
 
 interface Category {
   id: string;
   name: string;
   description: string;
+  seo_title?: string;
+  seo_description?: string;
 }
 
 interface Tool {
@@ -27,62 +27,122 @@ function CategoryView() {
   const { name } = useParams();
   const [category, setCategory] = useState<Category | null>(null);
   const [tools, setTools] = useState<Tool[]>([]);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
-  const toolsPerPage = 15;
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchData() {
-      if (name === 'all') {
-        const { data: toolsData, error } = await supabase
-          .from('tools')
-          .select('*')
-          .range((page - 1) * toolsPerPage, page * toolsPerPage - 1);
+      try {
+        setLoading(true);
         
-        if (toolsData) {
-          if (page === 1) {
-            setTools(toolsData);
-          } else {
-            setTools(prev => [...prev, ...toolsData]);
-          }
-          setHasMore(toolsData.length === toolsPerPage);
-        }
-      } else {
-        const { data: categoryData } = await supabase
-          .from('categories')
-          .select('*')
-          .ilike('name', name?.replace(/-/g, ' ') || '')
-          .single();
-        
-        if (categoryData) {
-          setCategory(categoryData);
-          const { data: toolsData } = await supabase
+        if (name === 'all') {
+          // Show all tools
+          const { data: toolsData, error } = await supabase
             .from('tools')
             .select('*')
-            .eq('category_id', categoryData.id)
-            .range((page - 1) * toolsPerPage, page * toolsPerPage - 1);
+            .order('created_at', { ascending: false });
+          
+          if (error) {
+            console.error('Error fetching tools:', error);
+            return;
+          }
           
           if (toolsData) {
-            if (page === 1) {
-              setTools(toolsData);
-            } else {
-              setTools(prev => [...prev, ...toolsData]);
+            setTools(toolsData);
+            setCategory({
+              id: 'all',
+              name: 'All Tools',
+              description: 'Browse all available AI tools in our directory'
+            });
+          }
+        } else {
+          // Show specific category
+          const { data: categoryData, error: categoryError } = await supabase
+            .from('categories')
+            .select('*')
+            .ilike('name', name?.replace(/-/g, ' ') || '')
+            .single();
+          
+          if (categoryError) {
+            console.error('Error fetching category:', categoryError);
+            return;
+          }
+          
+          if (categoryData) {
+            setCategory(categoryData);
+            
+            const { data: toolsData, error: toolsError } = await supabase
+              .from('tools')
+              .select('*')
+              .eq('category_id', categoryData.id)
+              .order('created_at', { ascending: false });
+            
+            if (toolsError) {
+              console.error('Error fetching tools:', toolsError);
+              return;
             }
-            setHasMore(toolsData.length === toolsPerPage);
+            
+            if (toolsData) {
+              setTools(toolsData);
+            }
           }
         }
+      } catch (error) {
+        console.error('Error:', error);
+      } finally {
+        setLoading(false);
       }
     }
     
     fetchData();
-  }, [name, page]);
+  }, [name]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-royal-dark py-20">
+        <div className="container mx-auto px-4">
+          <div className="animate-pulse">
+            <div className="h-8 bg-slate-700 rounded w-64 mb-8"></div>
+            <div className="h-12 bg-slate-700 rounded w-96 mb-4"></div>
+            <div className="h-6 bg-slate-600 rounded w-full max-w-2xl mb-12"></div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="bg-royal-dark-card rounded-xl overflow-hidden">
+                  <div className="aspect-square bg-slate-700"></div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!category) {
+    return (
+      <div className="min-h-screen bg-royal-dark py-20">
+        <div className="container mx-auto px-4">
+          <div className="text-center">
+            <h1 className="text-3xl font-bold text-white mb-4">Category Not Found</h1>
+            <p className="text-gray-400 mb-8">The category you're looking for doesn't exist.</p>
+            <Link 
+              to="/categories"
+              className="inline-flex items-center text-royal-gold hover:text-royal-gold/80"
+            >
+              <ChevronRight className="w-5 h-5 mr-2" />
+              Back to Categories
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
       {category && (
         <SEO
-          title={`${category.name} AI Tools | AItoonic`}
-          description={category.description}
+          title={category.seo_title || `${category.name} AI Tools | Aitoonic`}
+          description={category.seo_description || category.description}
           type="website"
           schema={generateCategorySchema(category, tools)}
         />
@@ -98,20 +158,18 @@ function CategoryView() {
             {name !== 'all' && (
               <>
                 <ChevronRight className="w-4 h-4 text-gray-600" />
-                <span className="text-gray-300">{category?.name}</span>
+                <span className="text-gray-300">{category.name}</span>
               </>
             )}
           </div>
 
           <div className="mb-12">
             <h1 className="text-4xl md:text-5xl font-bold mb-6 gradient-text">
-              {name === 'all' ? 'All Tools' : category?.name}
+              {category.name}
             </h1>
-            {category && (
-              <p className="text-xl text-gray-300 max-w-3xl">
-                {category.description}
-              </p>
-            )}
+            <p className="text-xl text-gray-300 max-w-3xl">
+              {category.description}
+            </p>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
@@ -123,7 +181,7 @@ function CategoryView() {
               >
                 <div className="aspect-square relative overflow-hidden">
                   <img
-                    src={tool.image_url || 'https://images.unsplash.com/photo-1676277791608-ac54783d753b'}
+                    src={tool.image_url || 'https://images.unsplash.com/photo-1676277791608-ac54783d753b?auto=format&fit=crop&q=80&w=400'}
                     alt={tool.name}
                     className="w-full h-full object-cover"
                   />
@@ -141,14 +199,16 @@ function CategoryView() {
             ))}
           </div>
 
-          {hasMore && (
-            <div className="text-center mt-12">
-              <button
-                onClick={() => setPage(prev => prev + 1)}
-                className="inline-flex items-center justify-center bg-royal-dark-card text-royal-gold px-8 py-3 rounded-lg font-bold hover:bg-royal-dark-lighter transition-colors"
+          {tools.length === 0 && (
+            <div className="text-center py-20">
+              <h2 className="text-2xl font-bold text-white mb-4">No Tools Found</h2>
+              <p className="text-gray-400 mb-8">This category doesn't have any tools yet.</p>
+              <Link
+                to="/categories"
+                className="inline-flex items-center bg-royal-gold text-royal-dark px-6 py-3 rounded-lg font-bold hover:bg-opacity-90 transition-all"
               >
-                Load More Tools
-              </button>
+                Browse Other Categories
+              </Link>
             </div>
           )}
         </div>
