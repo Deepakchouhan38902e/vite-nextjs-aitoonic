@@ -65,12 +65,14 @@ const ToolCard = React.memo(({ tool, priority = false }: { tool: Tool; priority?
     to={`/ai/${tool.name.toLowerCase().replace(/\s+/g, '-')}`}
     className="group card card-hover will-change-transform"
   >
-    <LazyImage
-      src={tool.image_url || 'https://images.unsplash.com/photo-1676277791608-ac54783d753b?auto=format&fit=crop&q=80&w=400'}
-      alt={tool.name}
-      priority={priority}
-      className="aspect-16-9 rounded-t-xl overflow-hidden"
-    />
+    <div className="aspect-16-9 rounded-t-xl overflow-hidden">
+      <img
+        src={tool.image_url || 'https://images.unsplash.com/photo-1676277791608-ac54783d753b?auto=format&fit=crop&q=80&w=400'}
+        alt={tool.name}
+        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+        loading={priority ? 'eager' : 'lazy'}
+      />
+    </div>
     <div className="p-4">
       <h3 className="font-semibold text-white text-sm mb-2 line-clamp-1 group-hover:text-primary-400 transition-colors">
         {tool.name}
