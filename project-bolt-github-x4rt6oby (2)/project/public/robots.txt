@@ -1,0 +1,25 @@
+# Allow all crawlers
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://aitoonic.com/sitemap.xml
+
+# Disallow admin area
+Disallow: /admin
+
+# Crawl-delay
+Crawl-delay: 10
+
+# Additional rules
+Allow: /*.js
+Allow: /*.css
+Allow: /*.png
+Allow: /*.jpg
+Allow: /*.gif
+Allow: /*.svg
+Allow: /*.ico
+
+# Prevent duplicate content
+Disallow: /*?*
+Disallow: /*?

@@ -1,0 +1,19 @@
+{
+  "name": "Aitoonic",
+  "short_name": "Aitoonic",
+  "icons": [
+    {
+      "src": "/sparkles.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "/sparkles.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ],
+  "theme_color": "#C6A355",
+  "background_color": "#080B1A",
+  "display": "standalone"
+}
